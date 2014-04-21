@@ -39,6 +39,11 @@
 #define ORIGIN_BIRD_HEIGHT 2
 #define ORIGIN_BIRD_WIDTH 6
 
+// Parameters for the game
+#define BIRD_FALL_TIME 2
+#define BIRD_JUMP_HEIGHT 4
+#define FALL_ACCELERATION 2
+
 // Pipe standards
 #define NUM_PIPES 4
 #define PIPE_HEIGHT_MAX 30
@@ -93,6 +98,7 @@ struct _pipe {
   Rect rect;
   unsigned char topHeight;
   unsigned char gap;
+  unsigned char currentPipe;
   Rect rectTop;
   Rect rectBottom;  
 };
@@ -166,7 +172,16 @@ unsigned char passPipe = 0;
 void drawBird(Rect f);
 void moveBirdUp();
 void moveBirdDown();
+void birdJump(void);
+void collision(void);
 
+unsigned char hitPipe = 0;
+unsigned char pipeLeftTopY;
+unsigned char pipeLeftBotY;
+unsigned char pipeLeftX;
+unsigned char pipeRightX;
+unsigned char birdX;
+unsigned char birdY;
 Rect birdRect;
 
 /*********************************************************************** 
@@ -186,9 +201,13 @@ unsigned char prevBot = 0;
 ***********************************************************************/
 void updatePipeSet();
 void drawStart();
+void drawScore();
+void gameOver();
 
 unsigned char updateDisplay = 0;
 unsigned char start = 0;
+unsigned char gameScore = 0;
+unsigned char gameOverFlag = 0;
 
 
 /*********************************************************************** 
@@ -213,6 +232,9 @@ const char line6[80] = "        \\/              \\/     \\/     \\/            
 const char option1[12] = "Start Game";
 const char option2[12] = "Secret Mode";
 const char option3[12] = "About";
+const char youDied[12] = "Game Over";
+const char pressAny[40] = "Press Any Push Button to Continue";
+char dispScore[9] = "Score 0  ";
 
 
 
@@ -586,7 +608,6 @@ void drawStart() {
   birdRect.frame.width = ORIGIN_BIRD_WIDTH;
   drawBird(birdRect); 
   
-  
   // Draw test pipes
   pipes[0].rect.origin.x = 25;
   pipes[0].rect.origin.y = 0;
@@ -627,7 +648,50 @@ void drawStart() {
   drawPipeSet(pipes[3]);
   
   pipeFront = 0;
-  pipeEnd = NUM_PIPES - 1;  
+  pipeEnd = NUM_PIPES - 1; 
+}
+
+// output current game score in top right
+void drawScore() {
+  unsigned char ones;
+  unsigned char tens;
+  i = 0;
+  globalPoint.x = 70;
+  globalPoint.y = 1;
+  
+  // either two or one digit number
+  if((gameScore / 10) > 0) {
+    ones = gameScore % 10;
+    tens = gameScore / 10;
+    dispScore[6] = tens + '0';
+    dispScore[7] = ones + '0';
+  } else {
+    dispScore[6] = gameScore + '0';
+  }
+  
+  for(i = 0; i < 9; i++) {
+    writeColorChar(globalPoint, COLOR_WHITE, dispScore[i]);
+    globalPoint.x++; 
+  }
+  
+}
+
+void gameOver() {
+  clearScreen();
+  i = 0;
+  globalPoint.x = 32;
+  globalPoint.y = 14;
+  for(i = 0; i < 12; i++) {
+    writeColorChar(globalPoint, COLOR_GREEN, youDied[i]);
+    globalPoint.x++;    
+  }
+  globalPoint.y++;
+  globalPoint.x = 20;
+  for(i = 0; i < 40; i++) {
+    writeColorChar(globalPoint, COLOR_GREEN, pressAny[i]);
+    globalPoint.x++;
+  }
+  
 }
 
 // Moves bird up
@@ -636,6 +700,13 @@ void moveBirdUp() {
   //clearScreen();
   birdRect.origin.y--;
   drawBird(birdRect);
+}
+
+// Simulates a "jump"
+void birdJump() {
+  clearRect(birdRect);
+  birdRect.origin.y -= BIRD_JUMP_HEIGHT;
+  drawBird(birdRect); 
 }
 
 // Moves bird down
@@ -652,6 +723,19 @@ Pipe movePipeLeft(Pipe p) {
   clearRect(p.rectTop);
   clearRect(p.rectBottom);
   p.rect.origin.x--;
+  
+  // set the pipe closest to the bird
+  if(p.rect.origin.x <= 15) {
+    p.currentPipe = 1;
+  } else {
+    p.currentPipe = 0;
+  }
+  
+  // pipe has passed the bird, increment the score
+  if(p.rect.origin.x < 5 && p.rect.origin.x > 3) {
+    gameScore++;
+  }
+  
   p = calcPipeRects(p);
   drawPipeSet(p);
   return p;      
@@ -683,11 +767,45 @@ void updatePipeSet() {
 }
 
 
+// check for the bird running into pipes
+void collision() {
+  int j;
+  birdX = birdRect.origin.x;
+  // normalize to the height of the screen
+  birdY = birdRect.origin.y % MAX_Y; 
+  
+  for(j=0; j<4; j++) {
+    pipeLeftTopY = pipes[j].topHeight;
+    pipeLeftBotY = pipes[j].topHeight + pipes[j].gap;
+    // normalize to the width of the screen
+    pipeLeftX = pipes[j].rect.origin.x % MAX_X;
+    pipeRightX = pipes[j].rect.origin.x + pipes[j].rect.frame.width % MAX_X;  
+    
+    if(pipes[j].currentPipe) {
+      // hit the top half of the pipe
+      if(birdY <= pipeLeftTopY && birdX >= pipeLeftX && (birdX + ORIGIN_BIRD_WIDTH) <= pipeRightX) {
+        hitPipe = 1;
+      }
+      
+      // hit the bottom half of the pipe
+      if((birdY + ORIGIN_BIRD_HEIGHT) >= pipeLeftBotY && birdX >= pipeLeftX && (birdX + ORIGIN_BIRD_WIDTH) <= pipeRightX) {
+        hitPipe = 1;
+      }
+    }
+  }
+}
+
+
 	 		  			 		  		
 /***********************************************************************
 Main
 ***********************************************************************/
 void main(void) {
+  // local variables
+  int birdfall = 0;
+  int accel = 1;
+  int count = 0;
+  
   DisableInterrupts;
 	initializations(); 		  			 		  		
 	EnableInterrupts;
@@ -702,6 +820,18 @@ void main(void) {
   
   for(;;) {
   //loop
+    
+    // Game Over Screen 
+    if(gameOverFlag) {
+      if(toppb || botpb) {
+        toppb = 0;
+        botpb = 0;
+        mainMenu = 1;
+        initialDraw = 1;
+        updateDisplay = 1;
+        gameOverFlag = 0;
+      }
+    }
     
     // Main Menu/Title Screen
     if(mainMenu) {      
@@ -738,23 +868,59 @@ void main(void) {
     if(start) {
       start = 0;
       drawStart();
+      drawScore();     
       play = 1;
     }
     
-    // Game logic?
+    // bird hit the pipe, restart game
+    if(hitPipe) {
+      hitPipe = 0;
+      start = 0;
+      play = 0;
+      gameScore = 0;
+      gameOverFlag = 1;
+      dispScore[7] = ' ';
+      gameOver();
+    }
+    
+    // Game logic
     if(updateDisplay && play) {
-      updateDisplay = 0;
+      // "pop"the bird up
+      if(toppb) {
+        toppb = 0;
+        accel = 1;
+        birdJump();
+      } else {
+        birdfall++;
+      }
       
+      // control the downward fall of the bird
+      if(birdfall == BIRD_FALL_TIME) {
+        birdfall = 0;
+        count = accel;
+        moveBirdDown();        
+        
+        // accelerate the birds fall
+        do {
+          moveBirdDown();
+          count -= FALL_ACCELERATION;
+        } while (count > 0);
+        accel++;
+      }      
+      
+      // move pipes
+      updateDisplay = 0;      
       pipes[0] = movePipeLeft(pipes[0]);
       pipes[1] = movePipeLeft(pipes[1]);
       pipes[2] = movePipeLeft(pipes[2]);
       pipes[3] = movePipeLeft(pipes[3]);
-      
       updatePipeSet();
       
+      // calculate if the bird has hit a pipe
+      collision();
+      drawScore();
     }
     
-
     _FEED_COP(); /* feeds the dog */
   } /* loop forever */
   /* please make sure that you never leave main */
@@ -801,6 +967,8 @@ interrupt 7 void RTI_ISR(void)
   	}
     prevBot = (PTAD&0x40);
     
+
+    
 }
 
 /***********************************************************************                       
@@ -813,7 +981,9 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   // set TFLG1 bit 
- 	TFLG1 = TFLG1 | 0x80; 
+ 	TFLG1 = TFLG1 | 0x80;
+ 	
+ 	 
 
 }
 
