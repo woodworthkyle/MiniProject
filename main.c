@@ -194,6 +194,18 @@ unsigned char prevTop = 0;
 unsigned char botpb = 0;
 unsigned char prevBot = 0;
 
+/***********************************************************************
+*
+* Sound Logic
+*
+***********************************************************************/
+
+int buzzcount = 0;
+unsigned char buzz = 0;
+int wincount = 0;
+unsigned char winbuzz = 0;
+
+
 /*********************************************************************** 
 *
 * Main Logic
@@ -286,6 +298,27 @@ void  initializations(void) {
   // Initialize RTI for 2.048 ms interrupt rate
   RTICTL = 0x1F;
   CRGINT = 0x80;
+  
+  // Initialize TIM for 10ms interrupt rate
+  TSCR1 = 0x80;  
+  TSCR2 = 0x0C;  
+  TIOS = 0x80; 
+  TC7 = 15000;
+  TIE = 0x80;
+  
+  // Initialize PWM  
+  MODRR = 0x02;
+  PWMCTL = 0x00;
+  PWMPOL = 0x00;
+  PWMCAE = 0x00;
+  PWMPER1 = 0xFF;
+  PWMDTY1 = 0x00;
+  PWMPRCLK = 0x04; 
+  PWMCLK = 0x02;
+  PWMSCLA = 0x03;
+  PWME = 0x02;
+
+
      
 }
 
@@ -692,6 +725,14 @@ void gameOver() {
     globalPoint.x++;
   }
   
+  //If the high score is beaten, sound an alarm
+  if(gameScore > 2){
+    PWMDTY1 = 0x80;
+    wincount = 0;
+    winbuzz = 1;
+  }
+
+  
 }
 
 // Moves bird up
@@ -826,6 +867,7 @@ void main(void) {
       if(toppb || botpb) {
         toppb = 0;
         botpb = 0;
+        gameScore = 0;
         mainMenu = 1;
         initialDraw = 1;
         updateDisplay = 1;
@@ -877,16 +919,33 @@ void main(void) {
       hitPipe = 0;
       start = 0;
       play = 0;
-      gameScore = 0;
+      //gameScore = 0; moved to if(gameOverFlag) so high score can be assessed
       gameOverFlag = 1;
       dispScore[7] = ' ';
       gameOver();
     }
     
+    //PWM should be silent if no buzz is needed
+    if(!buzz & !winbuzz)
+      PWMDTY1 = 0;
+    
+    //High score buzzer logic
+    if(winbuzz){
+      if(wincount == 25)
+        PWMDTY1 = 0x40;
+      if(wincount == 50)
+        PWMDTY1 = 0x80;
+    }
+
+
+    
     // Game logic
     if(updateDisplay && play) {
       // "pop"the bird up
       if(toppb) {
+        PWMDTY1 = 0x80; //turn on the PWM
+        buzzcount = 0;
+        buzz = 1;    
         toppb = 0;
         accel = 1;
         birdJump();
@@ -981,7 +1040,28 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   // set TFLG1 bit 
- 	TFLG1 = TFLG1 | 0x80;
+   TFLG1 = TFLG1 | 0x80;
+   
+   //Flapping noise logic
+ 	 if(buzz && buzzcount < 10) {
+   if(buzzcount == 5)
+    PWMDTY1 = PWMDTY1 / 2;
+   buzzcount++;
+  }
+  else if(buzz){
+   buzzcount = 0;
+   buzz = 0;
+  }
+
+  //Winning Siren Logic
+  if(winbuzz && wincount < 50) {
+    wincount++ ;
+  } else if (winbuzz){
+    wincount = 0;
+    winbuzz++;
+    if(winbuzz > 6)
+      winbuzz = 0;
+  }
  	
  	 
 
@@ -1012,4 +1092,3 @@ void outchar(char ch) {
     while (!(SCISR1 & 0x80));  /* wait for output buffer empty */
     SCIDRL = ch;
 }
-
