@@ -1,3 +1,4 @@
+
 /***********************************************************************
 ; ECE 362 - Mini-Project - Spring 2015
 ;***********************************************************************
@@ -121,7 +122,7 @@ unsigned char asciiRet = 0;
 
 /*********************************************************************** 
 *
-* Harware Level
+* Hardware Level
 *
 ***********************************************************************/
 int ms_delay(int x);
@@ -218,8 +219,25 @@ void gameOver();
 
 unsigned char updateDisplay = 0;
 unsigned char start = 0;
-unsigned char gameScore = 0;
+unsigned char  gameScore = 0;
 unsigned char gameOverFlag = 0;
+
+/*********************************************************************** 
+*
+* Accelerometer
+*
+***********************************************************************/
+unsigned char startATD();
+Accel getATD();
+unsigned char motionSelect();
+unsigned char motionUp();
+unsigned char motionDown();
+
+Accel accelData;
+unsigned char sampleATD;
+int x = 0;    //x-axis
+int y = 0;    //y-axis
+int z = 0;    //z-axis
 
 
 /*********************************************************************** 
@@ -296,7 +314,7 @@ void  initializations(void) {
   PTT = 0x00;
   
   // Initialize RTI for 2.048 ms interrupt rate
-  RTICTL = 0x1F;
+  RTICTL = 0x1F; //RTICTL = 0x1F;  now 1.024ms
   CRGINT = 0x80;
   
   // Initialize TIM for 10ms interrupt rate
@@ -836,7 +854,65 @@ void collision() {
   }
 }
 
+Accel getATD() {
+  PTT_PTT1 = 1;
+  ATDCTL5 = 0x10;     
+    
+  while (!ATDSTAT0_SCF) {};
+    
+  tmpAccel.y = ATDDR0H;
+  tmpAccel.z = ATDDR1H;
+  tmpAccel.x = ATDDR2H;
+  
+  /*
+  outchar((tmpAccel.x / 100) + 48);
+  outchar((tmpAccel.x / 10) % 10 + 48);
+  outchar((tmpAccel.x % 10) + 48);
+  outchar(' ');
+    
+  outchar((tmpAccel.y / 100) + 48);
+  outchar((tmpAccel.y / 10) % 10 + 48);
+  outchar((tmpAccel.y % 10) + 48);
+  outchar(' ');
+    
+  outchar((tmpAccel.z / 100) + 48);
+  outchar((tmpAccel.z / 10) % 10 + 48);
+  outchar((tmpAccel.z % 10) + 48);
+  outchar('\n');
+  outchar('\r'); 
+  */
+  
+  return tmpAccel;    
+}
 
+// Detect a 'select/confirm' motion
+unsigned char motionSelect() {
+  if(accelData.y > 115 && accelData.z > 95) {
+    return 1;    
+  }
+  return 0;
+}
+
+// Detect up motion
+unsigned char motionUp() {
+  if(accelData.z > 100) {
+   outchar((tmpAccel.z / 100) + 48);
+   outchar((tmpAccel.z / 10) % 10 + 48);
+   outchar((tmpAccel.z % 10) + 48);
+   outchar('\n');
+   outchar('\r');
+    return 1;    
+  }
+  return 0;  
+}
+
+// Detect down motion
+unsigned char motionDown() {
+  if(accelData.z < 60) {
+    return 1;    
+  }
+  return 0;  
+}
 	 		  			 		  		
 /***********************************************************************
 Main
@@ -874,6 +950,8 @@ void main(void) {
         gameOverFlag = 0;
       }
     }
+    
+    
     
     // Main Menu/Title Screen
     if(mainMenu) {      
@@ -942,7 +1020,7 @@ void main(void) {
     // Game logic
     if(updateDisplay && play) {
       // "pop"the bird up
-      if(toppb) {
+      if(motionUp()) {
         PWMDTY1 = 0x80; //turn on the PWM
         buzzcount = 0;
         buzz = 1;    
@@ -1026,6 +1104,9 @@ interrupt 7 void RTI_ISR(void)
   	}
     prevBot = (PTAD&0x40);
     
+    if(play) {
+      accelData = getATD();
+    }
 
     
 }
