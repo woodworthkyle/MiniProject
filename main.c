@@ -1003,7 +1003,7 @@ void main(void) {
     }
     
     // bird hit the pipe, restart game
-    /*
+    
     if(hitPipe) {
       hitPipe = 0;
       start = 0;
@@ -1012,7 +1012,7 @@ void main(void) {
       gameOverFlag = 1;
       dispScore[7] = ' ';
       gameOver();
-    }*/
+    }
     
     //PWM should be silent if no buzz is needed
     if(!buzz & !winbuzz)
@@ -1039,7 +1039,7 @@ void main(void) {
         accel = 1;
         birdJump();
       } else {
-        //birdfall++;
+        birdfall++;
       }
       
       // control the downward fall of the bird
