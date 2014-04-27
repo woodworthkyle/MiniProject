@@ -16,6 +16,7 @@
 #include <hidef.h>      /* common defines and macros */
 #include "derivative.h"      /* derivative-specific definitions */
 #include <mc9s12c32.h>
+#include <stdlib.h>
 
 // X and Y limits
 #define MIN_X 0
@@ -813,6 +814,7 @@ void updatePipeSet() {
     // Random pipe generation?
     //
     //
+    pipes[pipeFront].topHeight = 2 + rand() % 15;
     pipes[pipeFront].rect.origin.x = pipes[pipeEnd].rect.origin.x + pipes[pipeEnd].rect.frame.width + PIPE_SPACE_MIN;
     pipes[pipeFront].rect.origin.y = 0;
     
@@ -831,7 +833,7 @@ void collision() {
   int j;
   birdX = birdRect.origin.x;
   // normalize to the height of the screen
-  birdY = birdRect.origin.y % MAX_Y; 
+  birdY = birdRect.origin.y; 
   
   for(j=0; j<4; j++) {
     pipeLeftTopY = pipes[j].topHeight;
@@ -848,6 +850,11 @@ void collision() {
       
       // hit the bottom half of the pipe
       if((birdY + ORIGIN_BIRD_HEIGHT) >= pipeLeftBotY && birdX >= pipeLeftX && (birdX + ORIGIN_BIRD_WIDTH) <= pipeRightX) {
+        hitPipe = 1;
+      }
+      
+      // hit the top or bottom of screen
+      if(birdY > MAX_Y) {
         hitPipe = 1;
       }
     }
@@ -887,7 +894,7 @@ Accel getATD() {
 
 // Detect a 'select/confirm' motion
 unsigned char motionSelect() {
-  if(accelData.y > 115 && accelData.z > 95) {
+  if(accelData.y > 130 && accelData.z < 60) {
     return 1;    
   }
   return 0;
@@ -895,12 +902,7 @@ unsigned char motionSelect() {
 
 // Detect up motion
 unsigned char motionUp() {
-  if(accelData.z > 100) {
-   outchar((tmpAccel.z / 100) + 48);
-   outchar((tmpAccel.z / 10) % 10 + 48);
-   outchar((tmpAccel.z % 10) + 48);
-   outchar('\n');
-   outchar('\r');
+  if(accelData.z < 120) {
     return 1;    
   }
   return 0;  
@@ -908,12 +910,7 @@ unsigned char motionUp() {
 
 // Detect forwards and backwards
 unsigned char motionForth() {
-  if(accelData.y > 100) {
-   outchar((tmpAccel.z / 100) + 48);
-   outchar((tmpAccel.z / 10) % 10 + 48);
-   outchar((tmpAccel.z % 10) + 48);
-   outchar('\n');
-   outchar('\r');
+  if(accelData.y < 100) {
     return 1;    
   }
   return 0;  
@@ -975,7 +972,7 @@ void main(void) {
         drawMainMenu();  
       }
       
-      if(motionForth()) {
+      if(motionSelect()) {
         toppb = 0;
         menuSelect--;
         if(menuSelect <= 0) {
@@ -990,7 +987,7 @@ void main(void) {
         }
       }
       
-      if(motionUp()) {
+      if(motionForth()) {
         botpb = 0;
         mainMenu = 0;
         start = 1;
@@ -1006,6 +1003,7 @@ void main(void) {
     }
     
     // bird hit the pipe, restart game
+    /*
     if(hitPipe) {
       hitPipe = 0;
       start = 0;
@@ -1014,7 +1012,7 @@ void main(void) {
       gameOverFlag = 1;
       dispScore[7] = ' ';
       gameOver();
-    }
+    }*/
     
     //PWM should be silent if no buzz is needed
     if(!buzz & !winbuzz)
@@ -1041,7 +1039,7 @@ void main(void) {
         accel = 1;
         birdJump();
       } else {
-        birdfall++;
+        //birdfall++;
       }
       
       // control the downward fall of the bird
