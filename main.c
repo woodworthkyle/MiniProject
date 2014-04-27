@@ -1,4 +1,3 @@
-
 /***********************************************************************
 ; ECE 362 - Mini-Project - Spring 2015
 ;***********************************************************************
@@ -954,7 +953,7 @@ void main(void) {
     
     // Game Over Screen 
     if(gameOverFlag) {
-      if(toppb || botpb) {
+      if(motionForth()) {
         toppb = 0;
         botpb = 0;
         gameScore = 0;
@@ -1105,6 +1104,7 @@ interrupt 7 void RTI_ISR(void)
   	if(timerAccum == 50) {
   	  updateDisplay = 1;
       timerAccum = 0;  	  
+      accelData = getATD();
   	}
   	
   	if(!(PTAD&0x80) && prevTop) {
@@ -1118,9 +1118,8 @@ interrupt 7 void RTI_ISR(void)
   	}
     prevBot = (PTAD&0x40);
     
-    if(play) {
-      accelData = getATD();
-    }
+  
+
 
     
 }
