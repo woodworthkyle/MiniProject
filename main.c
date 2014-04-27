@@ -232,6 +232,7 @@ Accel getATD();
 unsigned char motionSelect();
 unsigned char motionUp();
 unsigned char motionDown();
+unsigned char motionForth();
 
 Accel accelData;
 unsigned char sampleATD;
@@ -906,6 +907,19 @@ unsigned char motionUp() {
   return 0;  
 }
 
+// Detect forwards and backwards
+unsigned char motionForth() {
+  if(accelData.y > 100) {
+   outchar((tmpAccel.z / 100) + 48);
+   outchar((tmpAccel.z / 10) % 10 + 48);
+   outchar((tmpAccel.z % 10) + 48);
+   outchar('\n');
+   outchar('\r');
+    return 1;    
+  }
+  return 0;  
+}
+
 // Detect down motion
 unsigned char motionDown() {
   if(accelData.z < 60) {
@@ -962,7 +976,7 @@ void main(void) {
         drawMainMenu();  
       }
       
-      if(toppb) {
+      if(motionForth()) {
         toppb = 0;
         menuSelect--;
         if(menuSelect <= 0) {
@@ -977,7 +991,7 @@ void main(void) {
         }
       }
       
-      if(botpb) {
+      if(motionUp()) {
         botpb = 0;
         mainMenu = 0;
         start = 1;
