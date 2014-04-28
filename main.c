@@ -42,7 +42,7 @@
 
 // Parameters for the game
 #define BIRD_FALL_TIME 2
-#define BIRD_JUMP_HEIGHT 4
+#define BIRD_JUMP_HEIGHT 2
 #define FALL_ACCELERATION 2
 
 // Pipe standards
@@ -258,19 +258,18 @@ unsigned char mainMenu = 0;
 unsigned char menuSelect = 0;
 unsigned char play = 0;
 
-const char line1[80] = "   ___________.__                       .__.__  __________.__           .___";
-const char line2[80] = "   \\_   _____/|  | _____    ______ ____ |__|__| \\______   \\__|______  __| _/";	 	   		
-const char line3[80] = "    |    __)  |  | \\__  \\  /  ___// ___\\|  |  |  |    |  _/  \\_  __ \\/ __ | ";
-const char line4[80] = "    |     \\   |  |__/ __ \\_\\___ \\\\  \\___|  |  |  |    |   \\  ||  | \\/ /_/ | ";
-const char line5[80] = "    \\___  /   |____(____  /____  >\\___  >__|__|  |______  /__||__|  \\____ | ";
-const char line6[80] = "        \\/              \\/     \\/     \\/                \\/               \\/ ";
+const char line1[80] = "   ___________.__                               __________.__  __";
+const char line2[80] = "   \\_   _____/|  | _____  ______ ______ ___.__. \\______   \\__|/  |_  ______";	 	   		
+const char line3[80] = "    |    __)  |  | \\__  \\ \\____ \\\\____ <   |  |  |    |  _/  \\   __\\/  ___/";
+const char line4[80] = "    |     \\   |  |__/ __ \\|  |_> >  |_> >___  |  |    |   \\  ||  |  \\___ \\";
+const char line5[80] = "    \\___  /   |____(____  /   __/|   __// ____|  |______  /__||__| /____  >";
+const char line6[80] = "        \\/              \\/|__|   |__|   \\/              \\/              \\/";
 
-const char option1[12] = "Start Game";
-const char option2[12] = "Secret Mode";
-const char option3[12] = "About";
+const char startText[16] = "Punch to Start";
 const char youDied[12] = "Game Over";
-const char pressAny[40] = "Press Any Push Button to Continue";
+const char pressAny[40] = "Punch to Continue";
 char dispScore[9] = "Score 0  ";
+char endScore[7] = "Score: ";
 
 /************************************************************************
 *
@@ -340,16 +339,16 @@ void  initializations(void) {
   TIE = 0x80;
   
   // Initialize PWM  
-  MODRR = 0x02;
+  MODRR = 0x01;
   PWMCTL = 0x00;
   PWMPOL = 0x00;
   PWMCAE = 0x00;
-  PWMPER1 = 0xFF;
-  PWMDTY1 = 0x00;
+  PWMPER0 = 0xFF;
+  PWMDTY0 = 0x00;
   PWMPRCLK = 0x04; 
   PWMCLK = 0x02;
   PWMSCLA = 0x03;
-  PWME = 0x02;
+  PWME = 0x01;
 
   //Flash Initializations
   FCLKDIV |= 41; //FCLOCK ~= 195kHz
@@ -625,27 +624,12 @@ void drawMainMenu() {
   birdRect.frame.width = ORIGIN_BIRD_WIDTH;
   drawBird(birdRect);
   
+  // Option at the middle
   i = 0;
-  globalPoint.x = 32;
+  globalPoint.x = 33;
   globalPoint.y = 14;
-  for(i = 0; i < 12; i++) {
-    writeColorChar(globalPoint, COLOR_GREEN, option1[i]);
-    globalPoint.x++;    
-  }
-  
-  i = 0;
-  globalPoint.x = 32;
-  globalPoint.y += 2;
-  for(i = 0; i < 12; i++) {
-    writeColorChar(globalPoint, COLOR_GREEN, option2[i]);
-    globalPoint.x++;    
-  }
-  
-  i = 0;
-  globalPoint.x = 32;
-  globalPoint.y += 2;
-  for(i = 0; i < 12; i++) {
-    writeColorChar(globalPoint, COLOR_GREEN, option3[i]);
+  for(i = 0; i < 16; i++) {
+    writeColorChar(globalPoint, COLOR_GREEN, startText[i]);
     globalPoint.x++;    
   }
   
@@ -679,7 +663,7 @@ void drawStart() {
   drawBird(birdRect); 
   
   // Draw test pipes
-  pipes[0].rect.origin.x = 25;
+  pipes[0].rect.origin.x = 45;
   pipes[0].rect.origin.y = 0;
   pipes[0].rect.frame.height = PIPE_HEIGHT_MAX;
   pipes[0].rect.frame.width = PIPE_WIDTH_MIN;
@@ -747,20 +731,45 @@ void drawScore() {
 }
 
 void gameOver() {
+  char tens;
+  char ones;
+  
   clearScreen();
   i = 0;
-  globalPoint.x = 32;
+  globalPoint.x = 35;
   globalPoint.y = 14;
   for(i = 0; i < 12; i++) {
     writeColorChar(globalPoint, COLOR_GREEN, youDied[i]);
     globalPoint.x++;    
   }
   globalPoint.y++;
-  globalPoint.x = 20;
+  globalPoint.x = 31;
   for(i = 0; i < 40; i++) {
     writeColorChar(globalPoint, COLOR_GREEN, pressAny[i]);
     globalPoint.x++;
   }
+  globalPoint.y++;
+  globalPoint.x = 36;
+  for(i = 0; i < 7; i++) {
+    writeColorChar(globalPoint, COLOR_GREEN, endScore[i]);
+    globalPoint.x++;
+  }
+  
+  // either two or one digit number
+  if((gameScore / 10) > 0) {
+    ones = gameScore % 10;
+    tens = gameScore / 10;
+    tens = tens + '0';
+    ones = ones + '0';
+    writeColorChar(globalPoint, COLOR_GREEN, tens);
+    globalPoint.x++;
+    writeColorChar(globalPoint, COLOR_GREEN, ones);
+  } else {
+    ones = gameScore % 10;
+    ones = ones + '0';
+    writeColorChar(globalPoint, COLOR_GREEN, ones);
+  }
+  
   
   //If the high score is beaten, sound an alarm
   if(gameScore > *highScore){
@@ -853,7 +862,13 @@ void collision() {
   int j;
   birdX = birdRect.origin.x;
   // normalize to the height of the screen
-  birdY = birdRect.origin.y; 
+  birdY = birdRect.origin.y;
+  
+  // hit the top or bottom of screen
+  if(birdY > MAX_Y) {
+    hitPipe = 1;
+    return;
+  } 
   
   for(j=0; j<4; j++) {
     pipeLeftTopY = pipes[j].topHeight;
@@ -873,10 +888,6 @@ void collision() {
         hitPipe = 1;
       }
       
-      // hit the top or bottom of screen
-      if(birdY > MAX_Y) {
-        hitPipe = 1;
-      }
     }
   }
 }
@@ -930,7 +941,7 @@ unsigned char motionUp() {
 
 // Detect forwards and backwards
 unsigned char motionForth() {
-  if(accelData.y < 100) {
+  if(accelData.y < 90) {
     return 1;    
   }
   return 0;  
@@ -990,6 +1001,7 @@ void main(void) {
   start = 0;
   play = 0;
   menuSelect = 1;
+  accelData.y = 128;
   
   for(;;) {
   //loop
@@ -1011,9 +1023,7 @@ void main(void) {
         gameOverFlag = 0;
       }
     }
-    
-    
-    
+   
     // Main Menu/Title Screen
     if(mainMenu) {      
       
@@ -1023,23 +1033,7 @@ void main(void) {
         drawMainMenu();  
       }
       
-      if(motionSelect()) {
-        toppb = 0;
-        menuSelect--;
-        if(menuSelect <= 0) {
-          menuSelect = MAIN_NUM_OPTIONS;
-          moveBirdDown();
-          moveBirdDown();
-          moveBirdDown();
-          moveBirdDown();
-        } else {
-          moveBirdUp();
-          moveBirdUp();  
-        }
-      }
-      
       if(motionForth()) {
-        botpb = 0;
         mainMenu = 0;
         start = 1;
       }
@@ -1054,7 +1048,6 @@ void main(void) {
     }
     
     // bird hit the pipe, restart game
-    
     if(hitPipe) {
       hitPipe = 0;
       start = 0;
@@ -1067,14 +1060,14 @@ void main(void) {
     
     //PWM should be silent if no buzz is needed
     if(!buzz & !winbuzz)
-      PWMDTY1 = 0;
+      PWMDTY0 = 0;
     
     //High score buzzer logic
     if(winbuzz){
       if(wincount == 25)
-        PWMDTY1 = 0x40;
+        PWMDTY0 = 0x40;
       if(wincount == 50)
-        PWMDTY1 = 0x80;
+        PWMDTY0 = 0x80;
     }
 
 
@@ -1083,10 +1076,9 @@ void main(void) {
     if(updateDisplay && play) {
       // "pop"the bird up
       if(motionUp()) {
-        PWMDTY1 = 0x80; //turn on the PWM
+        PWMDTY0 = 0x80; //turn on the PWM
         buzzcount = 0;
         buzz = 1;    
-        toppb = 0;
         accel = 1;
         birdJump();
       } else {
@@ -1188,7 +1180,7 @@ interrupt 15 void TIM_ISR(void)
    //Flapping noise logic
  	 if(buzz && buzzcount < 10) {
    if(buzzcount == 5)
-    PWMDTY1 = PWMDTY1 / 2;
+    PWMDTY0 = PWMDTY0 / 2;
    buzzcount++;
   }
   else if(buzz){
