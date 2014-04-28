@@ -58,6 +58,11 @@
 // Main Menu
 #define MAIN_NUM_OPTIONS 3
 
+// Flash Constants
+#define SECTOR_ERASE 0x40
+#define PROGRAM_WORD 0x20
+
+
 // Accelerometer Data
 struct __accel {
   unsigned char x;
@@ -267,7 +272,16 @@ const char youDied[12] = "Game Over";
 const char pressAny[40] = "Press Any Push Button to Continue";
 char dispScore[9] = "Score 0  ";
 
+/************************************************************************
+*
+* Flash Memory
+*
+************************************************************************/
 
+unsigned int * highScore = (unsigned int *) 0x8000; 
+unsigned char eraseSector();
+extern DoOnStack(unsigned int *far address);
+unsigned char programWord(unsigned int * dest, unsigned int data);
 
 
 /***********************************************************************
@@ -337,7 +351,11 @@ void  initializations(void) {
   PWMSCLA = 0x03;
   PWME = 0x02;
 
-
+  //Flash Initializations
+  FCLKDIV |= 41; //FCLOCK ~= 195kHz
+  FCLKDIV_PRDIV8 = 0;
+  FPROT = 0xFF;
+  FSTAT = FSTAT | (FSTAT_ACCERR | FSTAT_PVIOL);
      
 }
 
@@ -745,10 +763,12 @@ void gameOver() {
   }
   
   //If the high score is beaten, sound an alarm
-  if(gameScore > 2){
+  if(gameScore > *highScore){
     PWMDTY1 = 0x80;
     wincount = 0;
     winbuzz = 1;
+    eraseSector();
+    programWord(highScore,gameScore);
   }
 
   
@@ -923,6 +943,32 @@ unsigned char motionDown() {
   }
   return 0;  
 }
+
+void eraseSector() {
+  DisableInterrupts;
+  if(!FSTAT_CBEIF)
+    return; //command buffer not empty, cannot erase
+  FSTAT = FSTAT_ACCERR | FSTAT_PVIOL;
+  *highScore = 0xFFAA; //write data to pt to allow for erase
+  FCMD = SECTOR_ERASE;
+  (void)DoOnStack((unsigned int * far)0x3E8000);
+  EnableInterrupts;
+  return; 
+}
+
+
+void programWord(unsigned int * dest,unsigned int data){
+  if(FSTAT_CBEIF) {
+     DisableInterrupts
+     if(*dest != 0xFFFF) return; //see if the memory was erased
+     *dest = data; //set value to be programmed
+     FCMD = 0x20;
+     (void)DoOnStack((unsigned int * far)0x3E8000);
+    while(!FSTAT_CCIF); //wait for command to process
+    return;
+  }
+  return;
+}
 	 		  			 		  		
 /***********************************************************************
 Main
@@ -947,6 +993,11 @@ void main(void) {
   
   for(;;) {
   //loop
+    EnableInterrupts;
+    if(*highScore == 0xFFFF) {
+      eraseSector();
+      programWord(highScore, 0);
+    }
     
     // Game Over Screen 
     if(gameOverFlag) {
